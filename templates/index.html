@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TFG</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .sidebar {
+            height: 100vh;
+            width: 250px;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding-top: 20px;
+            padding-left: 10px;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        .sidebar h2 {
+            color: #ecf0f1;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .sidebar label {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            cursor: pointer;
+            position: relative;
+            color: #ecf0f1;
+        }
+        .sidebar label input {
+            margin-right: 10px;
+        }
+        .info-icon {
+            margin-left: 5px;
+            color: #888;
+            cursor: pointer;
+            position: relative;
+        }
+        .info-icon::before {
+            content: "ℹ️";
+            font-size: 16px;
+        }
+        .tooltip {
+            visibility: hidden;
+            width: 150px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 5px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 100%;
+            left: 50%;
+            margin-left: -75px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .info-icon:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+        .content {
+            margin-left: 250px;
+            padding: 20px;
+            flex: 1;
+            background: url('https://upload.wikimedia.org/wikipedia/commons/6/60/Soccer_Field_Layout.png') no-repeat center center fixed;
+            background-size: cover;
+            color: #2c3e50;
+        }
+        .container {
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        label.button-label {
+            background-color: #27ae60;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        label.button-label:hover {
+            background-color: #2ecc71;
+        }
+        button {
+            background-color: #2980b9;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3498db;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        video {
+            max-width: 100%;
+            height: auto;
+            display: none;
+        }
+        .annotation-options {
+            text-align: center;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        footer {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            text-align: center;
+            padding: 10px;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>Opciones</h2>
+    <div class="annotation-options">Seleccione las opciones de anotación antes de comenzar la inferencia</div>
+    <label><input type="checkbox" id="jugadores" checked> Anotar jugadores <span class="info-icon"><span class="tooltip">Seleccionar si se quieren anotar los jugadores</span></span></label>
+    <label><input type="checkbox" id="balon" checked> Anotar balón <span class="info-icon"><span class="tooltip">Seleccionar si se quiere anotar el balon</span></span></label>
+    <label><input type="checkbox" id="arbitros" checked> Anotar árbitros <span class="info-icon"><span class="tooltip">Seleccionar si se quieren anotar los árbitros</span></span></label>
+    <label><input type="checkbox" id="posesion" checked> Mostrar posesión <span class="info-icon"><span class="tooltip">Seleccionar si se quiere mostrar la posesión final</span></span></label>
+</div>
+
+<div class="content">
+    <div class="container">
+        <h1>Detección y seguimiento en acciones de fútbol</h1>
+
+        <input type="file" id="fileInput" accept="video/*">
+        <label for="fileInput" class="button-label">Seleccionar archivo de vídeo</label>
+        <button id="openWebcamButton" class="button-label">Abrir camara - Tiempo real</button>
+        <button id="startCaptureButton" disabled>Comenzar captura</button>
+        <button id="stopCaptureButton" disabled>Parar captura</button>
+        <button id="uploadButton" disabled>Subir archivo</button>
+        <button id="startButton" disabled>Comenzar</button>
+        <a id="resultsButton" class="button-label" download style="display: inline-block; background-color: #cccccc; cursor: not-allowed; pointer-events: none;">Descargar resultados</a>
+
+        <div id="videoContainer">
+            <video id="videoPlayer" controls>
+                <source id="videoSource" src="" type="video/mp4">
+                Tu navegador no soporta la reproducción de vídeos.
+            </video>
+            <video id="webcamPlayer" autoplay></video>
+        </div>
+    </div>
+</div>
+<footer>
+    <p>&copy; Gabriel Ramos Casas | Contacto: <a href="mailto:gabriel.ramos@alu.uclm.es" style="color: #ecf0f1;">gabriel.ramos@alu.uclm.es</a></p>
+    <p>Trabajo de Fin de Grado - Implementación de un modelo de detección y seguimiento en acciones de fútbol</p>
+</footer>
+<script>
+    let uploadedFilename = '';
+    let processedFilename = '';
+    let mediaRecorder;
+    let recordedChunks = [];
+
+    function showVideoFeed() {
+        const videoFeed = document.createElement('img');
+        videoFeed.id = 'videoFeed';
+        videoFeed.src = "{{ url_for('video_feed') }}";
+        videoFeed.width = 854;
+        videoFeed.height = 480;
+        document.getElementById('videoContainer').appendChild(videoFeed);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function() {
+        const uploadButton = document.getElementById('uploadButton');
+        const openWebcamButton = document.getElementById('openWebcamButton');
+        if (this.files.length > 0) {
+            uploadButton.disabled = false;
+            openWebcamButton.disabled = true;
+        } else {
+            uploadButton.disabled = true;
+        }
+    });
+
+    document.getElementById('uploadButton').addEventListener('click', function() {
+        const fileInput = document.getElementById('fileInput');
+        if (fileInput.files.length === 0) {
+            alert('Por favor, selecciona un archivo de vídeo primero.');
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+
+        fetch('/upload', {
+            method: 'POST',
+            body: formData
+        }).then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  alert('Archivo subido con éxito.');
+                  uploadedFilename = data.filename;
+                  const videoPlayer = document.getElementById('videoPlayer');
+                  const videoSource = document.getElementById('videoSource');
+                  videoSource.src = '/inputs/' + data.filename;
+                  videoPlayer.load();
+                  videoPlayer.style.display = 'block';
+                  document.getElementById('startButton').disabled = false;
+              } else {
+                  alert('Hubo un error al subir el archivo: ' + data.message);
+              }
+          }).catch(error => {
+              console.error('Error:', error);
+              alert('Hubo un error al subir el archivo.');
+          });
+    });
+
+    document.getElementById('startButton').addEventListener('click', function() {
+        const checkboxes = document.querySelectorAll('.sidebar input[type="checkbox"]');
+        const checkboxValues = {};
+        checkboxes.forEach((checkbox, index) => {
+            checkboxValues[`opcion${index + 1}`] = checkbox.checked;
+        });
+
+        fetch('/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(checkboxValues)
+        }).then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  alert('Acción comenzada con éxito.');
+                  const resultsButton = document.getElementById('resultsButton');
+                  resultsButton.style.backgroundColor = '#2980b9';
+                  resultsButton.style.cursor = 'pointer';
+                  resultsButton.style.pointerEvents = 'auto';
+                  processedFilename = uploadedFilename.replace(/\.[^/.]+$/, ".avi");
+                  resultsButton.href = '/resultados/' + processedFilename;
+              } else {
+                  alert('Hubo un error al comenzar la acción: ' + data.message);
+              }
+          }).catch(error => {
+              console.error('Error:', error);
+              alert('Hubo un error al comenzar la acción.');
+          });
+    });
+
+    document.getElementById('openWebcamButton').addEventListener('click', function() {
+        const startCaptureButton = document.getElementById('startCaptureButton');
+        const stopCaptureButton = document.getElementById('stopCaptureButton');
+        const fileInput = document.getElementById('fileInput');
+        showVideoFeed();
+        startCaptureButton.disabled = false;
+        stopCaptureButton.disabled = false;
+        fileInput.disabled = true;
+    });
+
+    document.getElementById('startCaptureButton').addEventListener('click', function() {
+        fetch('/start_capture');
+    });
+
+    document.getElementById('stopCaptureButton').addEventListener('click', function() {
+        fetch('/stop_capture');
+    });
+</script>
+
+</body>
+</html>
+
+
