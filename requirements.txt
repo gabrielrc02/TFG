@@ -1,0 +1,9 @@
+Flask==3.0.3
+numpy==1.26.4
+Werkzeug==3.0.3
+opencv-python
+ultralytics==8.2.45
+supervision==0.21.0
+pandas==2.2.2
+scikit-learn==1.5.0
+gdown==5.2.0
